@@ -28,9 +28,9 @@ The following functionality are supported by timon
 
 timon has 8 digital channels named `7-0`. These channels can be configured as input, output or a functional channel. Example of a functional channel is setting the channel to be SDI and SDO pins in SPI mode. Not all channels can be mapped to all functions. The mapping possibility will be defined in the corresponding mode specification.
 
-|||||||||
-|-|-|-|-|-|-|-|
-|7|6|5|4|3|2|1|0|
+|     |     |     |     |     |     |     |     |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|   7 |   6 |   5 |   4 |   3 |   2 |   1 | 0   |
 
 ## Communication Interface
 
