@@ -1,3 +1,3 @@
 #Firmware
 
-This Directory contains device formware source code and configurations. 
+This Directory contains device firmware source code and configurations. 
