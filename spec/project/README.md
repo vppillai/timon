@@ -20,7 +20,8 @@ The following functionality are supported by timon
 - UART mode :  here timon will act as a USB-UART bridge device
 - SPI mode  :  timon acts as a USB-SPI bridge in this mode
 - I2C mode  :  timon acts as a USB-I2C bridge in this mode.
-
+- PWM       :  use timon to generate a squarewave of desired frequency and duty cycle
+ 
 # Specification
 
 
@@ -42,16 +43,16 @@ The device interacts with the interface software using commands. Each command ha
 
 Since the interface enumerates as a serial port, all data transfer happens in the form of ASCII encoded characters. The software and firmware should do required conversions into the defined data formats before processing the command.
 
-All command opCodes are ASCII encoded string of three character length. For instance the setMode command is encoded as the string "001". The device should convert this into a 32bit unsigned integer to start operating on it. 
+All command opCodes are ASCII encoded string of three character length. For instance the setMode command is encoded as the string "001". The device should convert this into a 32bit unsigned integer to start operating on it.
 
 Arguments if any will be from the 4th character in the string. Length of the argument is command specific.  
 
 Command strings (opCode + arguments) should be terminated with a "\r"
- 
+
 
 ## acknowledgement
 
-When the device is done with performing a command and is ready to receive the next command, it will send a prompt indicator ( `>` [ASCII: 0x3E] ) in a new line as a CTS indication. 
+When the device is done with performing a command and is ready to receive the next command, it will send a prompt indicator ( `>` [ASCII: 0x3E] ) in a new line as a CTS indication.
 
 If the previous command failed , a failure string followed by an empty prompt indicator with a failure indicator ( `!` [ASCII: 0x21] ) will be sent. This will be followed by a regular prompt indicator. All these will be separated by `\r` .
 
@@ -82,7 +83,7 @@ _Usage sample:_ the command string "00101\r" will set the device to DIO mode and
 
 ### statCheck
 
-statCheck is a special single character command that can be used to synchronize the device and software operation. On receiving the statusCheck command, the device will respond with a CTS symbol [`>`] when ready. 
+statCheck is a special single character command that can be used to synchronize the device and software operation. On receiving the statusCheck command, the device will respond with a CTS symbol [`>`] when ready.
 
 |           |                       |
 |-----------|---------------        |
@@ -93,7 +94,7 @@ statCheck is a special single character command that can be used to synchronize 
 
 ## DIO mode
 
-In DIO mode, the device operates as a USB-I/O bridge. It listens to commands and drives / since signals into the device channels. 
+In DIO mode, the device operates as a USB-I/O bridge. It listens to commands and drives / since signals into the device channels.
 
 ### General operation
 
@@ -115,23 +116,23 @@ The steps to be taken to operate in DIO mode are :
 
 - set the execution frequency using `dioSetTick`
 - set the channel directions using `dioSetDir`
-- fill the device ring buffer with commands 
+- fill the device ring buffer with commands
 	- a buffer command can either be a read from multiple channels or a write to multiple channels only.
 - issue the execute command `dioExec`
 - issue the fetch command  `dioFetch`
 	-  This will make the device send back data from any channels that has been setup to read data.
 
-Device will store all read and write commands in ring buffer and executes on command. The ring buffer size is 512 bytes. Data read in from the channels will be de-serialized into 32 bit words and stored in channel specific ring buffers of 64 words each. This will be transmitted to the interface software when the fetch command is issued. 
+Device will store all read and write commands in ring buffer and executes on command. The ring buffer size is 512 bytes. Data read in from the channels will be de-serialized into 32 bit words and stored in channel specific ring buffers of 64 words each. This will be transmitted to the interface software when the fetch command is issued.
 
 ### dioSetTick
 
 |           |                                    |
 |-----------|---------------                     |
 | mnemonic  | dioSetTick                         |
-| opCode    | 002`                               |
+| opCode    | 002                                |
 | arguments | operating period in  microSeconds  |
 
-The device will setup an internal timer and execute each instruction in a ring buffer every time the timer expiry interrupt occurs. This timer frequency can be set using the `dioSetTick` command. 
+The device will setup an internal timer and execute each instruction in a ring buffer every time the timer expiry interrupt occurs. This timer frequency can be set using the `dioSetTick` command.
 
 _Usage Sample:_ `002100\r` will set the tick period to 100us
 
@@ -140,7 +141,7 @@ _Usage Sample:_ `002100\r` will set the tick period to 100us
 |           |                                                   |
 |-----------|---------------                                    |
 | mnemonic  | dioSetDir                                         |
-| opCode    | 003`                                              |
+| opCode    | 003                                               |
 | arguments | 2 char hex representation of direction bitmap |
 
 To set the direction of the channels , provide a three digit hex representation of the bitmap of the directions of all channels in the device in ASCII. `0` denotes output and `1` denotes input. As soon as DIO state is entered, all channels will be configured as output.  
@@ -152,12 +153,68 @@ _Usage Sample:_ to set direction of channel 1 to input, issue `00302\r`
 |           |               |
 |-----------|---------------|
 | mnemonic  | dioGetDir     |
-| opCode    | 004`          |
+| opCode    | 004           |
 | arguments | N/A           |
 
 Read out the current direction settings of all channels.  Device will return the 3 char hex representation of direction bitmap from the device.
 
-_Usage Sample:_ on successfully processing the command `004\r`, the device will return the current bitmap in the sample form `002\r` 
+_Usage Sample:_ on successfully processing the command `004\r`, the device will return the current direction bitmap in the sample form `002\r`
+
+### dioSetPullUp
+
+|           |               |
+|-----------|---------------|
+| mnemonic  | dioSetPullUp  |
+| opCode    | 013           |
+| arguments | N/A           |
+
+
+To enable the channel pullups , provide a three digit hex representation of the bitmap of the directions of all channels in the device in ASCII. `0` denotes pullup disabled and `1` denotes pull up enabled. As soon as DIO state is entered, all channels will be configured as pullup disabled.  
+
+*Note* If a pullDown is already set in the channel, this command should return an error. 
+
+_Usage Sample:_ to enable the pullup of  of channel 1 , issue `01302\r`
+
+
+### dioSetPullDn
+
+|           |               |
+|-----------|---------------|
+| mnemonic  | dioSetPullDn  |
+| opCode    | 014           |
+| arguments | N/A           |
+
+
+To enable the channel pulldown , provide a three digit hex representation of the bitmap of the directions of all channels in the device in ASCII. `0` denotes pulldown disabled and `1` denotes pulldown enabled. As soon as DIO state is entered, all channels will be configured as pulldown disabled.  
+
+*Note* If a pullup is already set in the channel, this command should return an error. 
+
+_Usage Sample:_ to enable the pulldown of  of channel 1 , issue `01402\r`
+
+### dioGetPullUp
+
+|           |               |
+|-----------|---------------|
+| mnemonic  | dioGetPullUp  |
+| opCode    | 015           |
+| arguments | N/A           |
+
+Read out the current pullUp settings of all channels.  Device will return the 3 char hex representation of pullUp bitmap from the device.
+
+_Usage Sample:_ on successfully processing the command `015\r`, the device will return the current pullUp status bitmap in the sample form `001\r`
+
+### dioGetPullDn
+
+|           |               |
+|-----------|---------------|
+| mnemonic  | dioGetPullDn  |
+| opCode    | 016           |
+| arguments | N/A           |
+
+Read out the current pullDown settings of all channels.  Device will return the 3 char hex representation of pullDown bitmap from the device.
+
+_Usage Sample:_ on successfully processing the command `016\r`, the device will return the current pullUp status bitmap in the sample form `001\r`
+
 
 ### dioWrite
 
@@ -193,7 +250,7 @@ _Usage Sample:_ `00603\r` will read the channels `0` and `1` and shift the data 
 
 `dioExec` will execute the commands in the command ring buffer for the number of times mentioned in the argument. The execution count is a word long and `0` indicates to continue execution until `dioStopExec` is issued.
 
-_Usage Sample:_ `007F3F7` will cyclically execute the instructions in the ring buffer 62455 times. 
+_Usage Sample:_ `007F3F7` will cyclically execute the instructions in the ring buffer 62455 times.
 
 ### dioStopExec
 
@@ -235,8 +292,8 @@ _Usage Sample:_ `010\r` will reset execution ring buffer
 
 |           |                                      |
 |-----------|--------------                        |
-| mnemonic  | dioFlushRb                           | 
-| opCode    | 011                                  | 
+| mnemonic  | dioFlushRb                           |
+| opCode    | 011                                  |
 | arguments | 2 byte hex string of bit map of read budders to flush  |
 
 Invalidate contents of all read ring buffers mentioned in the bitmap
@@ -248,8 +305,8 @@ _Usage Sample:_ `011FF\r` will clear and reset all read buffers.
 
 |           |                                             |
 |-----------|--------------                               |
-| mnemonic  | dioFetch                                    | 
-| opCode    | 012                                         | 
+| mnemonic  | dioFetch                                    |
+| opCode    | 012                                         |
 | arguments | 1 byte hex string of read buffers to fetch  |
 
 Pass contents of the read ring buffer to the software as a \r delimited stream of hex encoded data.
@@ -262,22 +319,26 @@ _Usage Sample:_ `0127\r` will transfer contents of read ring buffer 7 to the sof
 
 # Command summary
 
-| mnemonic    | opCode        | Arguments                                | 
-|-----------  |---------------|------------------                        |
-| statCheck   | `\r`          | N/A                                      |
-|             |               |                                          |
-| setMode     | 001           | -  DIO mode (01)                             |
-| 	      |               | - UART mode (02)                          |
-|             |               | - SPI mode (03)                           |
-| 	      |               | - I2C mode (04)                           |
-| dioSetTick  | 002           | tick period in us                        |
-| dioSetDir   | 003           | 2 character direction hex as string      |
-| dioGetDir   | 004           |N/A                                       | 
-| dioWrite    | 005           | 2 character write data  as hex           |
-| dioRead     | 006           | hex string of channels to be read        |
-| dioExec     | 007           | hex string of execution count            |
-| dioStopExec | 008           |N/A                                       | 
-| dioResetExec| 009           |N/A                                       | 
-| dioFlushExec| 010           |N/A                                       | 
-| dioFlushRb  | 011           |2 character hex string of Rbs to flush    | 
-| dioRead     | 011           |1 character hex string of Rb to read      | 
+| mnemonic      | opCode        | Arguments                                |
+|-----------    |---------------|------------------                        |
+| statCheck     | `\r`          | N/A                                      |
+|               |               |                                          |
+| setMode       | 001           | -  DIO mode (01)                         |
+| 	        |               | - UART mode (02)                         |
+|               |               | - SPI mode (03)                          |
+| 	        |               | - I2C mode (04)                          |
+| dioSetTick    | 002           | tick period in us                        |
+| dioSetDir     | 003           | 2 character direction hex as string      |
+| dioGetDir     | 004           |N/A                                       |
+| dioWrite      | 005           | 2 character write data  as hex           |
+| dioRead       | 006           | hex string of channels to be read        |
+| dioExec       | 007           | hex string of execution count            |
+| dioStopExec   | 008           |N/A                                       |
+| dioResetExec  | 009           |N/A                                       |
+| dioFlushExec  | 010           |N/A                                       |
+| dioFlushRb    | 011           |2 character hex string of Rbs to flush    |
+| dioRead       | 012           |1 character hex string of Rb to read      |
+| dioSetPullUp  | 013           |2 character pullUp bitmap hex as string   |
+| dioSetPullDn  | 014           |1 character pullDown bitmap hex as string |
+| dioGetPullUp  | 015           |N/A                                       |
+| dioGetPullDn  | 016           |N/A                                       |
